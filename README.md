@@ -1,6 +1,13 @@
 # CDataHustle
 
-# Usage
+
+## Dependencies
+```
+//Install boost
+sudo apt-get install libboost-all-dev
+```
+
+## Usage
 ```
 //Build
 mkdir build && cd build
@@ -9,7 +16,4 @@ make -j13 -o3
 
 // Run
 ./CDataHustle
-
-
-
 ```

@@ -53,7 +53,7 @@ long range(const uint16_t &min1, const uint16_t &max1, const uint16_t &min2, con
 void writeToFile(const String &dataset, const String &out_path){
     fs::path p{out_path};
     fs::path dir = p.parent_path();
-    fs::create_directory(dir);
+    fs::create_directories(dir);
 
     std::ofstream file;
     file.open (out_path);

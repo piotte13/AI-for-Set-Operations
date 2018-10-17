@@ -15,6 +15,10 @@ extern "C" {
 
 using timer = measure<std::chrono::nanoseconds>;
 using String = std::string;
+
+template <class T>
+using Vec2d = std::vector<std::vector<T>>;
+
 namespace fs = boost::filesystem;
 
 String get_cpu_name(){
@@ -58,32 +62,18 @@ void writeToFile(const String &dataset, const String &out_path){
 }
 
 template<typename F>
-String buildDataset(const String &data_path, const String &algoNames, F&& func){
-    size_t *howmany;
-    size_t count;
-    std::cout <<  "Loading data..."  << std::endl;
-    uint32_t **values = read_all_integer_files(data_path.c_str(), ".txt", &howmany, &count);
-
+String buildDataset(const Vec2d<uint16_t> &vals, const String &algoNames, F&& func){
     String dataset = "range, n1 , average1, std1, n2 , average2, std2, ";
     dataset += algoNames + "\n";
 
     //WriteTofile(append = false)
     std::cout <<  "computing stats..."  << std::endl;
-    std::vector<std::vector<uint16_t>> vals{};
     std::vector<double> avgs{};
     std::vector<double> stdevs{};
     std::vector<uint16_t > mins{};
     std::vector<uint16_t> maxs{};
 
-    for(auto i = 0; i < count; i++) {
-        std::vector<uint16_t> v{};
-        for(auto j = 0; j < howmany[i]; j++) {
-            if (values[i][j] > std::numeric_limits<uint16_t>::max()) {
-                v.push_back(values[i][j] >> 16);
-            }
-            v.push_back((uint16_t) (values[i][j] & 0xFFFF));
-        }
-        vals.push_back(v);
+    for(auto v : vals) {
         auto a = avg(v);
         avgs.push_back(a);
         stdevs.push_back(stdev(v, a));
@@ -108,18 +98,13 @@ String buildDataset(const String &data_path, const String &algoNames, F&& func){
         }
     }
     std::cout <<  "dataset done. \n"  << std::endl;
-    for(auto i = 0; i < count; i++){
-        delete[] values[i];
-    }
-    delete[] values;
-    delete[] howmany;
     return dataset;
 }
 
-std::vector<int> run_intersect_algos(const std::vector<uint16_t> &v1, const std::vector<uint16_t> &v2) {
-    std::vector<int> times{};
-    auto minCard = std::min(v1.size(), v2.size());
-    uint16_t *v3 = new uint16_t[minCard];
+std::vector<long> run_intersect_algos(const std::vector<uint16_t> &v1, const std::vector<uint16_t> &v2) {
+    std::vector<long> times{};
+    auto card = std::max(v1.size(), v2.size());
+    auto *v3 = new uint16_t[card];
 
     auto time = timer::execution( intersect_skewed_uint16, v1.data(), v1.size(), v2.data(), v2.size(), v3);
     times.push_back(time);
@@ -134,8 +119,8 @@ std::vector<int> run_intersect_algos(const std::vector<uint16_t> &v1, const std:
     return times;
 }
 
-std::vector<int> run_intersect_card_algos(const std::vector<uint16_t> &v1, const std::vector<uint16_t> &v2) {
-    std::vector<int> times{};
+std::vector<long> run_intersect_card_algos(const std::vector<uint16_t> &v1, const std::vector<uint16_t> &v2) {
+    std::vector<long> times{};
 
     auto time = timer::execution( intersect_skewed_uint16_cardinality, v1.data(), v1.size(), v2.data(), v2.size());
     times.push_back(time);
@@ -152,21 +137,53 @@ std::vector<int> run_intersect_card_algos(const std::vector<uint16_t> &v1, const
     return times;
 }
 
+Vec2d <uint16_t> load_data(const String &data_path){
+    size_t *howmany;
+    size_t count;
+    std::vector<std::vector<uint16_t>> vals{};
+
+    std::cout <<  "Loading data...\n"  << std::endl;
+    uint32_t **values = read_all_integer_files(data_path.c_str(), ".txt", &howmany, &count);
+
+    for(auto i = 0; i < count; i++) {
+        std::vector<uint16_t> v{};
+        for(auto j = 0; j < howmany[i]; j++) {
+            if (values[i][j] > std::numeric_limits<uint16_t>::max()) {
+                v.push_back((uint16_t) (values[i][j] >> 16));
+            }
+            v.push_back((uint16_t) (values[i][j] & 0xFFFF));
+        }
+        vals.push_back(v);
+    }
+    for(auto i = 0; i < count; i++){
+        delete[] values[i];
+    }
+    delete[] values;
+    delete[] howmany;
+    return vals;
+}
+
 int main() {
-    fs::path data_path = fs::system_complete("../realdata/census-income");
 
-    //Intersect_dataset
-    fs::path out_path = fs::system_complete("../results/" + get_cpu_name() + "/Intersect_dataset.csv");
-    std::cout <<  "Building " << out_path.filename().string() << "..."  << std::endl;
-    auto dataset = buildDataset(data_path.string(), "skewed_1, skewed_2, non_skewed", run_intersect_algos);
-    writeToFile(dataset, out_path.string());
+    fs::directory_iterator it{fs::system_complete("../realdata")};
+    for(auto dir : it){
+        std::cout <<  "Opening " << dir.path().filename().string() << "..."  << std::endl;
+        auto data = load_data(dir.path().string());
 
-    //Intersect_card_dataset
-    out_path = fs::system_complete("../results/" + get_cpu_name() + "/Intersect_card_dataset.csv");
-    std::cout <<  "Building " << out_path.filename().string() << "..."  << std::endl;
-    dataset = buildDataset(data_path.string(), "skewed_1, skewed_2, non_skewed, vector", run_intersect_card_algos);
-    writeToFile(dataset, out_path.string());
+        fs::path out_path = fs::system_complete("../results/" + get_cpu_name() + "/" + dir.path().filename().string());
 
+        //Intersect_dataset
+        auto filename = "/Intersect_dataset.csv";
+        std::cout << "building " << filename << std::endl;
+        auto dataset = buildDataset(data, "skewed_1, skewed_2, non_skewed", run_intersect_algos);
+        writeToFile(dataset, out_path.string() +  filename);
+
+        //Intersect_card_dataset
+        filename = "/Intersect_card_dataset.csv";
+        std::cout << "building " << filename << std::endl;
+        dataset = buildDataset(data, "skewed_1, skewed_2, non_skewed, vector", run_intersect_card_algos);
+        writeToFile(dataset, out_path.string() + filename);
+    }
 
     return 0;
 }

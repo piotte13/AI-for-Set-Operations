@@ -2,18 +2,35 @@
 
 
 ## Dependencies
+##### Debian (dpkg)
 ```
-//Install boost
+sudo apt-get update 
+
+//Boost
 sudo apt-get install libboost-all-dev
 ```
+##### Red Hat (RPM) 
+``` 
+sudo yum update
+sudo yum install epel-release
 
-## Usage
+//Boost
+sudo yum install boost boost-thread boost-devel boost-filesystem
 ```
-//Build
+
+
+## Usage: Build datasets
+```
 mkdir build && cd build
+
 cmake ..
 make -j13 -o3
-
-// Run
 ./CDataHustle
+```
+
+## Machine Learning
+Start jupyter Notebook
+``` 
+cd "Machine Learning"
+jupyter notebook
 ```

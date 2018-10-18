@@ -62,9 +62,13 @@ void writeToFile(const String &dataset, const String &out_path){
 }
 
 template<typename F>
-String buildDataset(const Vec2d<uint16_t> &vals, const String &algoNames, F&& func){
+String buildDataset(const Vec2d<uint16_t> &vals, const std::vector<String> &algoNames, F&& func){
     String dataset = "range, n1 , average1, std1, n2 , average2, std2, ";
-    dataset += algoNames + "\n";
+    for(auto a : algoNames) {
+        dataset += ", " + a;
+    }
+    dataset += ", fastest_algo";
+    dataset += "\n";
 
     //WriteTofile(append = false)
     std::cout <<  "computing stats..."  << std::endl;
@@ -93,6 +97,9 @@ String buildDataset(const Vec2d<uint16_t> &vals, const String &algoNames, F&& fu
             for(auto t : times) {
                 ss << ", " << t;
             }
+            auto it = std::find(times.begin(), times.end(), *std::min_element(times.begin(), times.end()));
+            auto fastestAlgoIndex = std::distance(times.begin(), it);
+            ss << ", " << algoNames[fastestAlgoIndex];
             ss << "\n";
             dataset += ss.str();
         }
@@ -166,24 +173,44 @@ Vec2d <uint16_t> load_data(const String &data_path){
 int main() {
 
     fs::directory_iterator it{fs::system_complete("../realdata")};
-    for(auto dir : it){
+    Vec2d <uint16_t> masterData{};
+    auto gpu_name = get_cpu_name();
+    //Yeah.. that's how boost wants us to iterate in order to support older versions.
+    for(; it != fs::directory_iterator(); ++it){
+        auto dir = *it;
         std::cout <<  "Opening " << dir.path().filename().string() << "..."  << std::endl;
         auto data = load_data(dir.path().string());
+        masterData.insert(std::end(masterData), std::begin(data), std::end(data));
 
-        fs::path out_path = fs::system_complete("../results/" + get_cpu_name() + "/" + dir.path().filename().string());
+        fs::path out_path = fs::system_complete("../results/" + gpu_name + "/" + dir.path().filename().string());
 
         //Intersect_dataset
         auto filename = "/Intersect_dataset.csv";
         std::cout << "building " << filename << std::endl;
-        auto dataset = buildDataset(data, "skewed_1, skewed_2, non_skewed", run_intersect_algos);
+        auto dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed"}, run_intersect_algos);
         writeToFile(dataset, out_path.string() +  filename);
 
         //Intersect_card_dataset
         filename = "/Intersect_card_dataset.csv";
         std::cout << "building " << filename << std::endl;
-        dataset = buildDataset(data, "skewed_1, skewed_2, non_skewed, vector", run_intersect_card_algos);
+        dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
         writeToFile(dataset, out_path.string() + filename);
     }
+
+    auto out_path = fs::system_complete("../results/" + gpu_name);
+
+    //Intersect_masterset
+    auto filename = "/Intersect_masterset.csv";
+    std::cout << "building " << filename << std::endl;
+    auto dataset = buildDataset(masterData, {"skewed_1", "skewed_2", "non_skewed"}, run_intersect_algos);
+    writeToFile(dataset, out_path.string() +  filename);
+
+    //Intersect_card_masterset
+    filename = "/Intersect_card_masterset.csv";
+    std::cout << "building " << filename << std::endl;
+    dataset = buildDataset(masterData, {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
+    writeToFile(dataset, out_path.string() + filename);
+
 
     return 0;
 }

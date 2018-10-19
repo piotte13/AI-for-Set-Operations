@@ -63,11 +63,11 @@ void writeToFile(const String &dataset, const String &out_path){
 
 template<typename F>
 String buildDataset(const Vec2d<uint16_t> &vals, const std::vector<String> &algoNames, F&& func){
-    String dataset = "range, n1 , average1, std1, n2 , average2, std2, ";
+    String dataset = "range,n1,average1,std1,n2,average2,std2";
     for(auto a : algoNames) {
-        dataset += ", " + a;
+        dataset += "," + a;
     }
-    dataset += ", fastest_algo";
+    dataset += ",fastest_algo";
     dataset += "\n";
 
     //WriteTofile(append = false)
@@ -92,14 +92,14 @@ String buildDataset(const Vec2d<uint16_t> &vals, const std::vector<String> &algo
             std::stringstream ss;
             auto times = fw(func)(vals[i], vals[j]);
 
-            ss << rng << ", " << vals[i].size() << ", " << avgs[i] << ", " << stdevs[i] << ", "
-                << vals[j].size() << ", " << avgs[j] << ", " << stdevs[j];
+            ss << rng << "," << vals[i].size() << "," << avgs[i] << "," << stdevs[i] << ","
+                << vals[j].size() << "," << avgs[j] << "," << stdevs[j];
             for(auto t : times) {
-                ss << ", " << t;
+                ss << "," << t;
             }
             auto it = std::find(times.begin(), times.end(), *std::min_element(times.begin(), times.end()));
             auto fastestAlgoIndex = std::distance(times.begin(), it);
-            ss << ", " << algoNames[fastestAlgoIndex];
+            ss << "," << algoNames[fastestAlgoIndex];
             ss << "\n";
             dataset += ss.str();
         }

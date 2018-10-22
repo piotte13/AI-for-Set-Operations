@@ -1,0 +1,2 @@
+results/ filter=lfs diff=lfs merge=lfs -text
+realdata/ filter=lfs diff=lfs merge=lfs -text

@@ -42,8 +42,8 @@ double stdev(std::vector<uint16_t > const& v, const double &avg){
     std::for_each (std::begin(v), std::end(v), [&](const double d) {
         accum += (d - avg) * (d - avg);
     });
-
-    return std::sqrt(accum / (v.size()-1));
+    auto denum = (v.size()-1) > 0 ? (v.size()-1) : 1;
+    return std::sqrt(accum / denum);
 }
 
 long range(const uint16_t &min1, const uint16_t &max1, const uint16_t &min2, const uint16_t &max2){
@@ -175,14 +175,19 @@ int main() {
     fs::directory_iterator it{fs::system_complete("../realdata")};
     Vec2d <uint16_t> masterData{};
     auto gpu_name = get_cpu_name();
+    auto i = 0;
     //Yeah.. that's how boost wants us to iterate in order to support older versions.
     for(; it != fs::directory_iterator(); ++it){
         auto dir = *it;
-        std::cout <<  "Opening " << dir.path().filename().string() << "..."  << std::endl;
+        auto dataName = dir.path().filename().string();
+        std::cout <<  "Opening " << dataName << "..."  << std::endl;
         auto data = load_data(dir.path().string());
-        masterData.insert(std::end(masterData), std::begin(data), std::end(data));
 
-        fs::path out_path = fs::system_complete("../results/" + gpu_name + "/" + dir.path().filename().string());
+        //We will need other sets separated in order to test the masterset
+        if(dataName != "test_data")
+            masterData.insert(std::end(masterData), std::begin(data), std::end(data));
+
+        fs::path out_path = fs::system_complete("../results/" + gpu_name + "/" + dataName);
 
         //Intersect_dataset
         auto filename = "/Intersect_dataset.csv";
@@ -195,6 +200,7 @@ int main() {
         std::cout << "building " << filename << std::endl;
         dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
         writeToFile(dataset, out_path.string() + filename);
+        i++;
     }
 
     auto out_path = fs::system_complete("../results/" + gpu_name);

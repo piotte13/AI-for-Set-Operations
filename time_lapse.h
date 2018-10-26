@@ -9,6 +9,7 @@
 #include <chrono>
 
 #define fw(what) std::forward<decltype(what)>(what)
+#define NB_ITERATION 5
 
 /**
 * @ class measure
@@ -26,13 +27,19 @@ struct measure
     template<typename F, typename ...Args>
     static typename TimeT::rep execution(F&& func, Args&&... args)
     {
-        auto start = ClockT::now();
+        auto min = INT64_MAX;
+        for (auto i = 0; i < NB_ITERATION; i++){
+            auto start = ClockT::now();
 
-        fw(func)(std::forward<Args>(args)...);
+            fw(func)(std::forward<Args>(args)...);
 
-        auto duration = std::chrono::duration_cast<TimeT>(ClockT::now() - start);
+            auto duration = std::chrono::duration_cast<TimeT>(ClockT::now() - start).count();
+            if(duration < min){
+                min = duration;
+            }
+        }
 
-        return duration.count();
+        return min;
     }
 
     /**
@@ -50,4 +57,5 @@ struct measure
     }
 };
 
+#undef NB_ITERATION
 #endif //CDATAHUSTLE_TIME_LAPSE_H

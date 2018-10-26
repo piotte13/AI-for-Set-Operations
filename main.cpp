@@ -2,12 +2,15 @@
 #include <chrono>
 #include <vector>
 #include <numeric>
-#include <math.h>
+#include <cmath>
 #include "time_lapse.h"
 #include <fstream>
 #include "file_loader.h"
 #include <boost/filesystem.hpp>
 #include <sstream>
+#include <unordered_set>
+#include <random>
+
 extern "C" {
     #include "croaring/roaring.h"
 }
@@ -24,9 +27,9 @@ namespace fs = boost::filesystem;
 String get_cpu_name(){
     FILE* pipe = popen("cat /proc/cpuinfo | grep 'model name' | sed -n 1p | cut -d ':' -f 2 | awk '{$1=$1};1' | tr -d '\n'", "r");
     char buffer[128];
-    String result = "";
+    String result;
     while(!feof(pipe)) {
-        if(fgets(buffer, 128, pipe) != NULL)
+        if(fgets(buffer, 128, pipe) != nullptr)
             result += buffer;
     }
     pclose(pipe);
@@ -64,7 +67,7 @@ void writeToFile(const String &dataset, const String &out_path){
 template<typename F>
 String buildDataset(const Vec2d<uint16_t> &vals, const std::vector<String> &algoNames, F&& func){
     String dataset = "range,n1,average1,std1,n2,average2,std2";
-    for(auto a : algoNames) {
+    for(const auto &a : algoNames) {
         dataset += "," + a;
     }
     dataset += ",fastest_algo";
@@ -170,7 +173,44 @@ Vec2d <uint16_t> load_data(const String &data_path){
     return vals;
 }
 
+Vec2d <uint16_t> generate_random_data(int nb_set){
+    std::random_device rd;     // only used once to initialise (seed) engine
+    std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
+    std::uniform_int_distribution<uint16_t> uni(1,UINT16_MAX); // guaranteed unbiased
+    std::vector<std::vector<uint16_t>> vals{};
+
+    for(auto i = 0; i < nb_set; i++){
+        std::unordered_set<uint16_t > myset = {};
+        auto random_length = uni(rng);
+        while(myset.size() < random_length){
+            auto random_uint16 = uni(rng);
+            myset.insert(random_uint16);
+        }
+        vals.emplace_back(myset.begin(), myset.end());
+    }
+
+    return vals;
+}
+
+void test(){
+
+}
+
 int main() {
+//    auto iter = 5;
+//    auto totIter = 10000;
+//    std::vector<uint16_t> mins{};
+//    for(auto j = 0; j < totIter; j++){
+//        std::vector<uint16_t> times{};
+//        for(auto i = 0; i < iter; i++) {
+//            times.push_back(timer::execution(test));
+//        }
+//        mins.push_back(*std::min_element(times.begin(), times.end()));
+//    }
+//    std::cout << "average: " << avg(mins) << std::endl;
+//    std::cout << "stdev: " << stdev(mins, avg(mins)) << std::endl;
+//    std::cout << "max: " << *std::max_element(mins.begin(), mins.end()) << std::endl;
+//    std::cout << "min: " << *std::min_element(mins.begin(), mins.end()) << std::endl;
 
     fs::directory_iterator it{fs::system_complete("../realdata")};
     Vec2d <uint16_t> masterData{};
@@ -183,23 +223,26 @@ int main() {
         std::cout <<  "Opening " << dataName << "..."  << std::endl;
         auto data = load_data(dir.path().string());
 
-        //We will need other sets separated in order to test the masterset
-        if(dataName != "test_data")
-            masterData.insert(std::end(masterData), std::begin(data), std::end(data));
+        masterData.insert(std::end(masterData), std::begin(data), std::end(data));
 
-        fs::path out_path = fs::system_complete("../results/" + gpu_name + "/" + dataName);
-
-        //Intersect_dataset
-        auto filename = "/Intersect_dataset.csv";
-        std::cout << "building " << filename << std::endl;
-        auto dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed"}, run_intersect_algos);
-        writeToFile(dataset, out_path.string() +  filename);
-
-        //Intersect_card_dataset
-        filename = "/Intersect_card_dataset.csv";
-        std::cout << "building " << filename << std::endl;
-        dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
-        writeToFile(dataset, out_path.string() + filename);
+//        //We will need other sets separated in order to test the masterset
+//        if(dataName != "test_data")
+//            masterData.insert(std::end(masterData), std::begin(data), std::end(data));
+//        else{
+//            fs::path out_path = fs::system_complete("../results/" + gpu_name + "/" + dataName);
+//
+//            //Intersect_dataset
+//            auto filename = "/Intersect_dataset.csv";
+//            std::cout << "building " << filename << std::endl;
+//            auto dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed"}, run_intersect_algos);
+//            writeToFile(dataset, out_path.string() +  filename);
+//
+//            //Intersect_card_dataset
+//            filename = "/Intersect_card_dataset.csv";
+//            std::cout << "building " << filename << std::endl;
+//            dataset = buildDataset(data, {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
+//            writeToFile(dataset, out_path.string() + filename);
+//        }
         i++;
     }
 
@@ -215,6 +258,18 @@ int main() {
     filename = "/Intersect_card_masterset.csv";
     std::cout << "building " << filename << std::endl;
     dataset = buildDataset(masterData, {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
+    writeToFile(dataset, out_path.string() + filename);
+
+    //Intersect_testset
+    filename = "/Intersect_testset.csv";
+    std::cout << "building " << filename << std::endl;
+    dataset = buildDataset(generate_random_data(400), {"skewed_1", "skewed_2", "non_skewed"}, run_intersect_algos);
+    writeToFile(dataset, out_path.string() +  filename);
+
+    //Intersect_card_testset
+    filename = "/Intersect_card_testset.csv";
+    std::cout << "building " << filename << std::endl;
+    dataset = buildDataset(generate_random_data(400), {"skewed_1", "skewed_2", "non_skewed", "vector"}, run_intersect_card_algos);
     writeToFile(dataset, out_path.string() + filename);
 
 
